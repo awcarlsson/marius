@@ -10,16 +10,16 @@ class PyRelationOperator : RelationOperator {
   public:
     using RelationOperator::RelationOperator;
     Embeddings operator()(const Embeddings &embs, const Relations &rels) override { 
-      PYBIND11_OVERRIDE_NAME(Embeddings, RelationOperator, "__call__", operator(), embs, rels); }
+      PYBIND11_OVERRIDE_PURE_NAME(Embeddings, RelationOperator, "__call__", operator(), embs, rels); }
 };
 
-// this guy doesn't like the tuple of tensors
-// class PyComparator : Comparator {
-//   public:
-//     using Comparator::Comparator;
-//     tuple<torch::Tensor, torch::Tensor> operator()(const Embeddings &src, const Embeddings &dst, const Embeddings &negs) override { 
-//       PYBIND11_OVERRIDE_NAME(tuple<torch::Tensor, torch::Tensor>, Comparator, "__call__", operator(), src, dst, negs); }
-// };
+class PyComparator : Comparator {
+  public:
+    using Comparator::Comparator;
+    using ReturnTensorTuple = tuple<torch::Tensor, torch::Tensor>;
+    tuple<torch::Tensor, torch::Tensor> operator()(const Embeddings &src, const Embeddings &dst, const Embeddings &negs) override { 
+      PYBIND11_OVERRIDE_NAME(ReturnTensorTuple, Comparator, "__call__", operator(), src, dst, negs); }
+};
 
 class PyLossFunction : LossFunction {
   public:
@@ -38,20 +38,27 @@ class PyDecoder : Decoder {
 void init_decoder(py::module &m) {
 
   py::class_<RelationOperator, PyRelationOperator>(m, "RelationOperator")
+    .def(py::init<>())
     .def("__call__", &RelationOperator::operator(), py::arg("embs"), py::arg("rels"));
-  py::class_<HadamardOperator, RelationOperator>(m, "HadamardOperator");
-  py::class_<ComplexHadamardOperator, RelationOperator>(m, "ComplexHadamardOperator");
-  py::class_<TranslationOperator, RelationOperator>(m, "TranslationOperator");
-  py::class_<NoOp, RelationOperator>(m, "NoOp");
+  py::class_<HadamardOperator, RelationOperator>(m, "HadamardOperator")
+    .def(py::init<>());
+  py::class_<ComplexHadamardOperator, RelationOperator>(m, "ComplexHadamardOperator")
+    .def(py::init<>());
+  py::class_<TranslationOperator, RelationOperator>(m, "TranslationOperator")
+    .def(py::init<>());
+  py::class_<NoOp, RelationOperator>(m, "NoOp")
+    .def(py::init<>());
   
-  // py::class_<Comparator, PyComparator>(m, "Comparator")
-  //   .def("__call__", &Comparator::operator(), py::arg("src"), py::arg("dst"), py::arg("negs"));
-  // py::class_<CosineCompare, Comparator>(m, "CosineCompare")
-  //   .def(py::init<>());
-  // py::class_<DotCompare, Comparator>(m, "DotCompare")
-  //   .def(py::init<>());
+  py::class_<Comparator, PyComparator>(m, "Comparator")
+    //.def(py::init<>()) name conflict w torch? causes crash
+    .def("__call__", &Comparator::operator(), py::arg("src"), py::arg("dst"), py::arg("negs"));
+  py::class_<CosineCompare, Comparator>(m, "CosineCompare")
+    .def(py::init<>());
+  py::class_<DotCompare, Comparator>(m, "DotCompare")
+    .def(py::init<>());
 
   py::class_<LossFunction, PyLossFunction>(m, "LossFunction")
+    //.def(py::init<>()) // name conflict w torch? causes crash
     .def("__call__", &LossFunction::operator(), py::arg("pos_scores"), py::arg("neg_scores"));
   py::class_<SoftMax, LossFunction>(m, "SoftMax")
     .def(py::init<>());
@@ -62,6 +69,9 @@ void init_decoder(py::module &m) {
     .def(py::init<>())
     .def("forward", &Decoder::forward, py::arg("batch"), py::arg("train"));
   py::class_<LinkPredictionDecoder, Decoder>(m, "LinkPredictionDecoder")
+    .def_readwrite("comparator", &LinkPredictionDecoder::comparator_)
+    .def_readwrite("relation_operator", &LinkPredictionDecoder::relation_operator_)
+    .def_readwrite("loss_function", &LinkPredictionDecoder::loss_function_)
     .def(py::init<>())
     .def(py::init<Comparator *, RelationOperator *, LossFunction *>());
   py::class_<DistMult, LinkPredictionDecoder>(m, "DistMult")

@@ -94,12 +94,12 @@ class Decoder {
 };
 
 
-class LinkPredictionDecoder : public Decoder {
-  protected:
+class LinkPredictionDecoder : public Decoder { 
+  public:
     Comparator *comparator_;
     RelationOperator *relation_operator_;
     LossFunction *loss_function_;
-  public:
+    
     LinkPredictionDecoder();
 
     LinkPredictionDecoder(Comparator *comparator, RelationOperator *relation_operator, LossFunction *loss_function);

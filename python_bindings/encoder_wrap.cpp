@@ -14,7 +14,7 @@ class PyEncoder : Encoder {
 
 void init_encoder(py::module &m) {
   py::class_<Encoder, PyEncoder>(m, "Encoder")
-    .def(py::init<>())
+    .def(py::init<>(), py::return_value_policy::reference)
     .def("forward", &Encoder::forward, py::arg("batch"), py::arg("train"));
 
   py::class_<EmptyEncoder, Encoder>(m, "EmptyEncoder")
