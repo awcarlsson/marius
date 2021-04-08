@@ -123,7 +123,7 @@ torch::Tensor RankingLoss::operator()(const torch::Tensor &pos_scores, const tor
 
 NodeClassificationDecoder::NodeClassificationDecoder() {}
 
-LinkPredictionDecoder::LinkPredictionDecoder() {}
+LinkPredictionDecoder::LinkPredictionDecoder() {} // empty constructor = unusable?
 
 LinkPredictionDecoder::LinkPredictionDecoder(Comparator *comparator, RelationOperator *relation_operator, LossFunction *loss_function) {
     comparator_ = comparator;
@@ -143,11 +143,11 @@ void LinkPredictionDecoder::forward(Batch *batch, bool train) {
 
     // localSample
     batch->localSample();
-
+    SPDLOG_INFO("reached relation/comp use");
     // corrupt destination
     Embeddings adjusted_src_pos = (*relation_operator_)(batch->src_pos_embeddings_, batch->src_relation_emebeddings_);
     tie(rhs_pos_scores, rhs_neg_scores) = (*comparator_)(adjusted_src_pos, batch->dst_pos_embeddings_, batch->dst_all_neg_embeddings_);
-
+    SPDLOG_INFO("success");
     // corrupt source
     Embeddings adjusted_dst_pos = (*relation_operator_)(batch->dst_pos_embeddings_, batch->dst_relation_emebeddings_);
     tie(lhs_pos_scores, lhs_neg_scores) = (*comparator_)(adjusted_dst_pos, batch->src_pos_embeddings_, batch->src_all_neg_embeddings_);

@@ -18,14 +18,14 @@ class PyComparator : Comparator {
     using Comparator::Comparator;
     using ReturnTensorTuple = tuple<torch::Tensor, torch::Tensor>;
     tuple<torch::Tensor, torch::Tensor> operator()(const Embeddings &src, const Embeddings &dst, const Embeddings &negs) override { 
-      PYBIND11_OVERRIDE_NAME(ReturnTensorTuple, Comparator, "__call__", operator(), src, dst, negs); }
+      PYBIND11_OVERRIDE_PURE_NAME(ReturnTensorTuple, Comparator, "__call__", operator(), src, dst, negs); }
 };
 
 class PyLossFunction : LossFunction {
   public:
     using LossFunction::LossFunction;
     torch::Tensor operator()(const torch::Tensor &pos_scores, const torch::Tensor &neg_scores) override { 
-      PYBIND11_OVERRIDE_NAME(torch::Tensor, LossFunction, "__call__", operator(), pos_scores, neg_scores); }
+      PYBIND11_OVERRIDE_PURE_NAME(torch::Tensor, LossFunction, "__call__", operator(), pos_scores, neg_scores); }
 };
 
 class PyDecoder : Decoder {
@@ -50,7 +50,7 @@ void init_decoder(py::module &m) {
     .def(py::init<>());
   
   py::class_<Comparator, PyComparator>(m, "Comparator")
-    //.def(py::init<>()) name conflict w torch? causes crash
+    .def(py::init<>())
     .def("__call__", &Comparator::operator(), py::arg("src"), py::arg("dst"), py::arg("negs"));
   py::class_<CosineCompare, Comparator>(m, "CosineCompare")
     .def(py::init<>());
@@ -58,7 +58,7 @@ void init_decoder(py::module &m) {
     .def(py::init<>());
 
   py::class_<LossFunction, PyLossFunction>(m, "LossFunction")
-    //.def(py::init<>()) // name conflict w torch? causes crash
+    .def(py::init<>())
     .def("__call__", &LossFunction::operator(), py::arg("pos_scores"), py::arg("neg_scores"));
   py::class_<SoftMax, LossFunction>(m, "SoftMax")
     .def(py::init<>());
