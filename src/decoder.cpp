@@ -144,8 +144,10 @@ void LinkPredictionDecoder::forward(Batch *batch, bool train) {
     // localSample
     batch->localSample();
     SPDLOG_INFO("reached relation/comp use");
+    SPDLOG_INFO(typeid(*relation_operator_).name());
     // corrupt destination
     Embeddings adjusted_src_pos = (*relation_operator_)(batch->src_pos_embeddings_, batch->src_relation_emebeddings_);
+    SPDLOG_INFO("relation obtained");
     tie(rhs_pos_scores, rhs_neg_scores) = (*comparator_)(adjusted_src_pos, batch->dst_pos_embeddings_, batch->dst_all_neg_embeddings_);
     SPDLOG_INFO("success");
     // corrupt source
@@ -219,6 +221,7 @@ void LinkPredictionDecoder::forward(Batch *batch, bool train) {
 
         batch->host_transfer_.synchronize();
     }
+    SPDLOG_INFO("finish");
 }
 
 DistMult::DistMult() {

@@ -2,6 +2,7 @@
 #include <pybind11/stl.h>
 #include <pybind11/operators.h>
 #include <decoder.h>
+#include <torch/csrc/autograd/python_variable.h>
 
 namespace py = pybind11;
 
@@ -9,8 +10,29 @@ namespace py = pybind11;
 class PyRelationOperator : RelationOperator {
   public:
     using RelationOperator::RelationOperator;
-    Embeddings operator()(const Embeddings &embs, const Relations &rels) override { 
-      PYBIND11_OVERRIDE_PURE_NAME(Embeddings, RelationOperator, "__call__", operator(), embs, rels); }
+
+    py::object operator_helper(const Embeddings &embs, const Relations &rels) {
+      PyObject *pyo_embs = THPVariable_Wrap(embs);
+      py::object py_embs = pybind11::reinterpret_borrow<py::object>(pyo_embs);
+      PyObject *pyo_rels = THPVariable_Wrap(rels);
+      py::object py_rels = pybind11::reinterpret_borrow<py::object>(pyo_rels);
+      PYBIND11_OVERRIDE_PURE_NAME(py::object, RelationOperator, "__call__", operator(), py_embs, py_rels);
+    }
+
+    Embeddings operator()(const Embeddings &embs, const Relations &rels) override {
+      py::object ret_object = operator_helper(embs, rels);
+      SPDLOG_INFO("Done calling python");
+      PyObject *p = ret_object.ptr();
+      SPDLOG_INFO("po cast");
+      //SPDLOG_INFO(typeid(ret_object).name());
+      Embeddings ret_embed = THPVariable_Unpack(p).data();
+      //Embeddings ret_embed = ret_object.cast<torch::Tensor>();
+      SPDLOG_INFO("Done cast");
+      SPDLOG_INFO(typeid(ret_embed).name());
+      //return ret_embed.cast<Embeddings>();
+      return ret_embed;
+      //Embeddings rete = ret.cast<Embeddings>();
+    }
 };
 
 class PyComparator : Comparator {
