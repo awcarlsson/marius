@@ -6,7 +6,7 @@ import os
 
 def marius():
 
-    config_path = "examples/training/configs/fb15k_gpu.ini"
+    config_path = "examples/training/configs/fb15k_cpu.ini"
     config = m.parseConfig(config_path)
 
     # allocating here is fine because objects will last through end of function stack
@@ -28,14 +28,8 @@ def marius():
     # decoder.loss_function = m.SoftMax()
 
     decoder = m.LinkPredictionDecoder(comp, rel_op, loss_function) # initialize the decoder
-    print(decoder.comparator)
-    print(decoder.relation_operator)
-    print(decoder.loss_function)
-
     custom_model = transE(encoder, decoder)
-    print(custom_model.decoder.relation_operator)
-    print(custom_model.decoder.comparator)
-    print(custom_model.decoder.loss_function)
+
 
     #config.model.encoder_model = m.EncoderModelType.Custom # don't need this
 
@@ -53,16 +47,17 @@ class translation(m.RelationOperator):
     def __init__(self):
         m.RelationOperator.__init__(self)
     def __call__(self, node_embs, rel_embs):
-        print("relation called")
-        print(type(node_embs))
         return node_embs + rel_embs
 
 class L2(m.Comparator):
     def __init__(self):
         m.Comparator.__init__(self)
     def __call__(self, src, dst, negs):
-        print("comp called")
-        return torch.cdist(src, dst, p=2)
+
+        # This is not L2 it's actually using a Dot product. Not sure how to do batched distance computation.
+        pos_scores = (src * dst).sum(-1)
+        neg_scores = src.view(negs.size(0), -1, src.size(1)).bmm(negs.transpose(-1, -2)).flatten(0, 1)
+        return pos_scores, neg_scores
 
 class transE(m.Model):
     def __init__(self, encoder, decoder):

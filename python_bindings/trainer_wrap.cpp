@@ -9,7 +9,6 @@ class PyTrainer : Trainer {
   public:
     using Trainer::Trainer;
     void train(int num_epochs = 1) override {
-        py::gil_scoped_acquire acquire;
         PYBIND11_OVERRIDE_PURE(void, Trainer, train, num_epochs);
     }
 };

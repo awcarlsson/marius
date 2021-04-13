@@ -9,12 +9,20 @@ using std::make_tuple;
 using std::move;
 using std::tie;
 
+Embeddings padForBMM(Embeddings input, int num_chunks) {
+    int num_pos = input.size(0);
+    int num_per_chunk = (int) ceil((float) num_pos / num_chunks);
+
+    if (num_per_chunk != num_pos / num_chunks) {
+        int64_t new_size = num_per_chunk * num_chunks;
+        torch::nn::functional::PadFuncOptions options({0, 0, 0, new_size - num_pos});
+        input = torch::nn::functional::pad(input, options);
+    }
+    return input;
+}
+
+
 tuple<torch::Tensor, torch::Tensor> CosineCompare::operator()(const Embeddings &src, const Embeddings &dst, const Embeddings &negs) {
-
-    int num_chunks = negs.size(0);
-    int num_pos = src.size(0);
-    int num_per_chunk = (int64_t) ceil((float) num_pos / num_chunks);
-
     torch::Tensor src_norm = src.norm(2, -1);
     torch::Tensor dst_norm = dst.norm(2, -1);
     torch::Tensor neg_norm = negs.norm(2, -1);
@@ -23,41 +31,16 @@ tuple<torch::Tensor, torch::Tensor> CosineCompare::operator()(const Embeddings &
     Embeddings normalized_dst = dst * dst_norm.clamp_min(1e-10).reciprocal().unsqueeze(-1);
     Embeddings normalized_neg = negs * neg_norm.clamp_min(1e-10).reciprocal().unsqueeze(-1);
 
-    if (num_per_chunk != num_pos / num_chunks) {
-        int64_t new_size = num_per_chunk * num_chunks;
-        torch::nn::functional::PadFuncOptions options({0, 0, 0, new_size - num_pos});
-        normalized_src = torch::nn::functional::pad(normalized_src, options);
-        normalized_dst = torch::nn::functional::pad(normalized_dst, options);
-    }
-
     torch::Tensor pos_scores = (normalized_src * normalized_dst).sum(-1);
-    normalized_src = normalized_src.view({num_chunks, num_per_chunk, normalized_src.size(1)});
+    normalized_src = normalized_src.view({negs.size(0), -1, normalized_src.size(1)});
     torch::Tensor neg_scores = normalized_src.bmm(normalized_neg.transpose(-1, -2)).flatten(0, 1);
 
     return make_tuple(move(pos_scores), move(neg_scores));
 }
 
 tuple<torch::Tensor, torch::Tensor> DotCompare::operator()(const Embeddings &src, const Embeddings &dst, const Embeddings &negs) {
-
-    int num_chunks = negs.size(0);
-    int num_pos = src.size(0);
-    int num_per_chunk = (int) ceil((float) num_pos / num_chunks);
-
-    // apply relation operator
-    Embeddings adjusted_src = src;
-    Embeddings adjusted_dst = dst;
-
-    if (num_per_chunk != num_pos / num_chunks) {
-        int64_t new_size = num_per_chunk * num_chunks;
-        torch::nn::functional::PadFuncOptions options({0, 0, 0, new_size - num_pos});
-        adjusted_src = torch::nn::functional::pad(adjusted_src, options);
-        adjusted_dst = torch::nn::functional::pad(adjusted_dst, options);
-    }
-
-    torch::Tensor pos_scores = (adjusted_src * adjusted_dst).sum(-1);
-    adjusted_src = adjusted_src.view({num_chunks, num_per_chunk, src.size(1)});
-    torch::Tensor neg_scores = adjusted_src.bmm(negs.transpose(-1, -2)).flatten(0, 1);
-
+    torch::Tensor pos_scores = (src * dst).sum(-1);
+    torch::Tensor neg_scores = src.view({negs.size(0), -1, src.size(1)}).bmm(negs.transpose(-1, -2)).flatten(0, 1);
     return make_tuple(move(pos_scores), move(neg_scores));
 }
 
@@ -143,16 +126,20 @@ void LinkPredictionDecoder::forward(Batch *batch, bool train) {
 
     // localSample
     batch->localSample();
-    SPDLOG_INFO("reached relation/comp use");
-    SPDLOG_INFO(typeid(*relation_operator_).name());
+
+    int num_chunks = batch->dst_all_neg_embeddings_.size(0);
+    Embeddings src = padForBMM(batch->src_pos_embeddings_, num_chunks);
+    Embeddings dst = padForBMM(batch->dst_pos_embeddings_, num_chunks);
+
     // corrupt destination
     Embeddings adjusted_src_pos = (*relation_operator_)(batch->src_pos_embeddings_, batch->src_relation_emebeddings_);
-    SPDLOG_INFO("relation obtained");
-    tie(rhs_pos_scores, rhs_neg_scores) = (*comparator_)(adjusted_src_pos, batch->dst_pos_embeddings_, batch->dst_all_neg_embeddings_);
-    SPDLOG_INFO("success");
+    adjusted_src_pos = padForBMM(adjusted_src_pos, num_chunks);
+    tie(rhs_pos_scores, rhs_neg_scores) = (*comparator_)(adjusted_src_pos, dst, batch->dst_all_neg_embeddings_);
+
     // corrupt source
     Embeddings adjusted_dst_pos = (*relation_operator_)(batch->dst_pos_embeddings_, batch->dst_relation_emebeddings_);
-    tie(lhs_pos_scores, lhs_neg_scores) = (*comparator_)(adjusted_dst_pos, batch->src_pos_embeddings_, batch->src_all_neg_embeddings_);
+    adjusted_dst_pos = padForBMM(adjusted_dst_pos, num_chunks);
+    tie(lhs_pos_scores, lhs_neg_scores) = (*comparator_)(adjusted_dst_pos, src, batch->src_all_neg_embeddings_);
 
     // filter scores
     if (batch->dst_neg_filter_.defined()) {
@@ -221,7 +208,6 @@ void LinkPredictionDecoder::forward(Batch *batch, bool train) {
 
         batch->host_transfer_.synchronize();
     }
-    SPDLOG_INFO("finish");
 }
 
 DistMult::DistMult() {

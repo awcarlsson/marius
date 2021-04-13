@@ -10,8 +10,9 @@
 
 using std::tuple;
 
-// Relation Operators
+Embeddings padForBMM(Embeddings input, int num_chunks);
 
+// Relation Operators
 class RelationOperator {
   public:
     virtual ~RelationOperator() {};
