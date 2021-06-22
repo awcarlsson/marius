@@ -3,7 +3,7 @@
 
 namespace py = pybind11;
 
-//void init_batch(py::module &);
+void init_batch(py::module &);
 void init_config(py::module &);
 void init_dataset(py::module &);
 void init_datatypes(py::module &);
@@ -18,7 +18,7 @@ PYBIND11_MODULE(pymarius, m) {
 
 	m.doc() = "pybind11 marius plugin";
 
-//	init_batch(m);
+	init_batch(m);
 	init_config(m);
 	init_dataset(m);
 	init_datatypes(m);

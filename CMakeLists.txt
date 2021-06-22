@@ -9,11 +9,15 @@ include(FindPackageHandleStandardArgs)
 add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
 
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 12.0)
+        message(FATAL_ERROR "Clang version must be at least 12!")
+    endif()
     set(CLANG TRUE)
 elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
+        message(FATAL_ERROR "GCC version must be at least 9.0!")
+    endif()
     set(GCC TRUE)
-elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Intel")
-    set(ICC TRUE)
 else ()
     message(FATAL_ERROR "Unknown compiler")
 endif ()
@@ -27,12 +31,12 @@ if(NOT IS_ABSOLUTE ${MARIUS_TORCH_DIR})
 endif()
 
 set(Torch_DIR ${MARIUS_TORCH_DIR}/share/cmake/Torch)
-set(Boost_USE_MULTITHREADED TRUE)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
 if(${USE_CUDA})
     add_definitions(-DMARIUS_CUDA=${USE_CUDA})
 endif()
+
 
 # Find torch location
 execute_process(
@@ -48,14 +52,18 @@ execute_process(
 message(STATUS "Torch Version: ${TorchVersion}")
 
 # Add the cmake folder so the FindSphinx module is found
-set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
-set(project_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include)
-set(project_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/src)
+
+set(MARIUS_CPP_SOURCE ${CMAKE_CURRENT_LIST_DIR}/src/cpp)
+set(CMAKE_MODULE_PATH "${MARIUS_CPP_SOURCE}/cmake" ${CMAKE_MODULE_PATH})
+set(project_INCLUDE_DIR ${MARIUS_CPP_SOURCE}/include)
+set(project_SOURCE_DIR ${MARIUS_CPP_SOURCE}/src)
 set(project_TEST_DIR ${CMAKE_CURRENT_LIST_DIR}/test)
 set(project_DOCS_DIR ${CMAKE_CURRENT_LIST_DIR}/docs)
-set(project_BINDINGS_DIR ${CMAKE_CURRENT_LIST_DIR}/python_bindings)
-set(project_THIRD_PARTY_DIR ${CMAKE_CURRENT_LIST_DIR}/third_party)
+set(project_BINDINGS_DIR ${MARIUS_CPP_SOURCE}/python_bindings)
+set(project_THIRD_PARTY_DIR ${MARIUS_CPP_SOURCE}/third_party)
 
+
+set(project_WORKING_DIR ${CMAKE_CURRENT_BINARY_DIR})
 add_definitions(-DMARIUS_BASE_DIRECTORY="${CMAKE_CURRENT_LIST_DIR}")
 add_definitions(-DMARIUS_TEST_DIRECTORY="${project_TEST_DIR}")
 
@@ -70,16 +78,16 @@ if (EXISTS ${project_BINDINGS_DIR})
 endif ()
 
 add_subdirectory(${project_THIRD_PARTY_DIR})
-set_property(TARGET Boost_program_options PROPERTY POSITION_INDEPENDENT_CODE ON)
 set_property(TARGET spdlog PROPERTY POSITION_INDEPENDENT_CODE ON)
 include_directories(${project_INCLUDE_DIR})
 include_directories(${TORCH_INCLUDE_DIRS})
+include_directories(${project_THIRD_PARTY_DIR}/inih)
 add_library(${PROJECT_NAME} SHARED ${project_SOURCES} ${project_HEADERS})
 
 find_package(Torch REQUIRED)
 target_link_libraries(${PROJECT_NAME} ${TORCH_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} Boost::program_options)
 target_link_libraries(${PROJECT_NAME} spdlog)
+target_link_libraries(${PROJECT_NAME} cxxopts)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES PUBLIC_HEADER "${project_HEADERS}")
 
@@ -96,9 +104,9 @@ target_compile_options(${PROJECT_NAME}
         )
 
 IF(CMAKE_BUILD_TYPE MATCHES Debug AND MARIUS_USE_ASAN)
-   message("Using ASAN")
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address  -fsanitize=leak")
-   set(CMAKE_MODULE_LINKER_FLAGS "{$CMAKE_MODULE_LINKER_FLAGS}  -fsanitize=address -fsanitize=leak")
+    message("Using ASAN")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address  -fsanitize=leak")
+    set(CMAKE_MODULE_LINKER_FLAGS "{$CMAKE_MODULE_LINKER_FLAGS}  -fsanitize=address -fsanitize=leak")
 ENDIF(CMAKE_BUILD_TYPE MATCHES Debug AND MARIUS_USE_ASAN)
 
 
@@ -111,14 +119,14 @@ if (EXISTS ${project_TEST_DIR})
     add_subdirectory(${project_TEST_DIR})
 endif ()
 
-add_executable(marius_train src/marius.cpp)
-add_executable(marius_eval src/marius.cpp)
+add_executable(marius_train ${project_SOURCE_DIR}/marius.cpp)
+add_executable(marius_eval ${project_SOURCE_DIR}/marius.cpp)
 target_link_libraries(marius_train ${PROJECT_NAME})
 target_link_libraries(marius_eval ${PROJECT_NAME})
 
-pybind11_add_module(pymarius ${project_SOURCES} ${project_BINDINGS})
+pybind11_add_module(_pymarius ${project_SOURCES} ${project_BINDINGS})
 
 find_library(TORCH_PYTHON_LIBRARY torch_python PATHS "${TORCH_INSTALL_PREFIX}/lib")
 message(STATUS "TORCH_PYTHON_LIBRARY: ${TORCH_PYTHON_LIBRARY}")
-target_link_libraries(pymarius PRIVATE ${PROJECT_NAME} ${TORCH_PYTHON_LIBRARY})
-target_include_directories(pymarius PRIVATE ${project_INCLUDE_DIR})
+target_link_libraries(_pymarius PRIVATE ${PROJECT_NAME} ${TORCH_PYTHON_LIBRARY})
+target_include_directories(_pymarius PRIVATE ${project_INCLUDE_DIR})

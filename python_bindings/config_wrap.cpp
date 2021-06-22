@@ -6,7 +6,6 @@ namespace py = pybind11;
 
 void init_config(py::module &m) {
 
-    // GeneralOptions class
     py::class_<GeneralOptions>(m, "GeneralOptions")
         .def_readwrite("device", &GeneralOptions::device) // cast to pytorch type?
         .def_readwrite("random_seed", &GeneralOptions::random_seed)
@@ -18,7 +17,6 @@ void init_config(py::module &m) {
         .def_readwrite("num_relations", &GeneralOptions::num_relations)
         .def_readwrite("experiment_name", &GeneralOptions::experiment_name);
 
-    // ModelOptions class
     py::class_<ModelOptions>(m, "ModelOptions")
         .def_readwrite("scale_factor", &ModelOptions::scale_factor)
         .def_readwrite("initialization_distribution", &ModelOptions::initialization_distribution)
@@ -28,7 +26,6 @@ void init_config(py::module &m) {
         .def_readwrite("comparator", &ModelOptions::comparator)
         .def_readwrite("relation_operator", &ModelOptions::relation_operator);
 
-     // StorageOptions class
     py::class_<StorageOptions>(m, "StorageOptions")
         .def_readwrite("edges", &StorageOptions::edges)
         .def_readwrite("reinitialize_edges", &StorageOptions::reinitialize_edges)
@@ -45,7 +42,6 @@ void init_config(py::module &m) {
         .def_readwrite("prefetching", &StorageOptions::prefetching)
         .def_readwrite("conserve_memory", &StorageOptions::conserve_memory);
 
-    // TrainingOptions class
     py::class_<TrainingOptions>(m, "TrainingOptions")
         .def_readwrite("batch_size", &TrainingOptions::batch_size)
         .def_readwrite("number_of_chunks", &TrainingOptions::number_of_chunks)
@@ -64,7 +60,6 @@ void init_config(py::module &m) {
         .def_readwrite("checkpoint_interval", &TrainingOptions::checkpoint_interval)
         .def_readwrite("shuffle_interval", &TrainingOptions::shuffle_interval);
 
-    // TrainingPipelineOptions class
     py::class_<TrainingPipelineOptions>(m, "TrainingPipelineOptions")
         .def_readwrite("max_batches_in_flight", &TrainingPipelineOptions::max_batches_in_flight)
         .def_readwrite("update_in_flight", &TrainingPipelineOptions::update_in_flight)
@@ -78,7 +73,6 @@ void init_config(py::module &m) {
         .def_readwrite("num_gradient_transfer_threads", &TrainingPipelineOptions::num_gradient_transfer_threads)
         .def_readwrite("num_embedding_update_threads", &TrainingPipelineOptions::num_embedding_update_threads);
 
-    // EvaluationOptions class
     py::class_<EvaluationOptions>(m, "EvaluationOptions")
         .def_readwrite("batch_size", &EvaluationOptions::batch_size)
         .def_readwrite("number_of_chunks", &EvaluationOptions::number_of_chunks)
@@ -90,7 +84,6 @@ void init_config(py::module &m) {
         .def_readwrite("filtered_evaluation", &EvaluationOptions::filtered_evaluation)
         .def_readwrite("checkpoint_to_eval", &EvaluationOptions::checkpoint_to_eval);
 
-    // EvaluationPipelineOptions class
     py::class_<EvaluationPipelineOptions>(m, "EvaluationPipelineOptions")
         .def_readwrite("max_batches_in_flight", &EvaluationPipelineOptions::max_batches_in_flight)
         .def_readwrite("embeddings_host_queue_size", &EvaluationPipelineOptions::embeddings_host_queue_size)
@@ -99,7 +92,6 @@ void init_config(py::module &m) {
         .def_readwrite("num_embedding_transfer_threads", &EvaluationPipelineOptions::num_embedding_transfer_threads)
         .def_readwrite("num_evaluate_threads", &EvaluationPipelineOptions::num_evaluate_threads);
 
-    // PathOptions class
     py::class_<PathOptions>(m, "PathOptions")
         .def_readwrite("train_edges", &PathOptions::train_edges)
         .def_readwrite("train_edges_partitions", &PathOptions::train_edges_partitions)
@@ -119,7 +111,6 @@ void init_config(py::module &m) {
         .def_readwrite("logs_per_epoch", &ReportingOptions::logs_per_epoch)
         .def_readwrite("log_level", &ReportingOptions::log_level); // cast?
 
-    // MariusOptions class
     py::class_<MariusOptions>(m, "MariusOptions")
         .def_readwrite("general", &MariusOptions::general)
         .def_readwrite("model", &MariusOptions::model)
@@ -133,7 +124,6 @@ void init_config(py::module &m) {
 
 
     m.def("parseConfig", [](string config_path) {
-	// hacky, fix this
         char *argv[1];
 	    marius_options = parseConfig(config_path, 1, argv);
         return marius_options;
